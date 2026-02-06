@@ -1,0 +1,84 @@
+# ============================================================
+# MMPose v1.3.x – Docker-Image for RTX 4080 Laptop (Ada Lovelace sm_89)
+# CUDA 11.8 + PyTorch 2.1.0
+#
+# Target: Lenovo Legion Pro 7i 16 (RTX 4080, Ubuntu 22.04)
+# Host driver: 535.288.01 (CUDA compat up to 12.2)
+# Date: February 2026
+#
+# Lessons learned (see MEMORY.md):
+#   - PyPI mmcv==2.1.0 is the LITE version (no CUDA ops) — must build from source
+#   - OpenMMLab wheel server (download.openmmlab.com) is unreliable/slow
+#   - numpy 2.x breaks PyTorch 2.1 and xtcocotools — pin numpy<2 early
+#   - xtcocotools must be built from source with --no-deps to prevent numpy upgrade
+#   - xtcocotools needs cython + numpy installed first to generate _mask.c
+# ============================================================
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV FORCE_CUDA="1"
+ENV TORCH_CUDA_ARCH_LIST="7.0 7.5 8.0 8.6 8.9 9.0+PTX"
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    git wget curl ninja-build \
+    python3 python3-pip python3-dev \
+    libgl1-mesa-glx libglib2.0-0 libsm6 libxrender1 libxext6 \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python symlink and pip upgrade
+RUN ln -sf /usr/bin/python3 /usr/bin/python && \
+    pip install --upgrade pip setuptools wheel
+
+# Pin numpy<2 FIRST — PyTorch 2.1 was built against numpy 1.x
+# and xtcocotools C extensions are ABI-incompatible with numpy 2.x
+RUN pip install "numpy<2"
+
+# PyTorch 2.1.0 with CUDA 11.8 (Ada Lovelace fully supported)
+RUN pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 \
+    --index-url https://download.pytorch.org/whl/cu118
+
+# OpenMMLab dependencies (mmengine, mmdet)
+RUN pip install -U openmim && \
+    mim install mmengine && \
+    mim install "mmdet>=3.1.0,<3.3.0"
+
+# mmcv: build from source with CUDA ops
+# PyPI "mmcv" is the lite version without CUDA ops (_ext missing).
+# OpenMMLab's own wheel server is too slow/unreliable.
+RUN git clone https://github.com/open-mmlab/mmcv.git /tmp/mmcv && \
+    cd /tmp/mmcv && git checkout v2.1.0 && \
+    MMCV_WITH_OPS=1 pip install -v -e .
+
+# xtcocotools: must be built from source against numpy<2
+# --no-binary forces source build; --no-deps prevents pip pulling numpy 2.x
+RUN pip install cython && \
+    pip install --no-cache-dir --no-binary xtcocotools --no-build-isolation --no-deps xtcocotools
+
+# chumpy: broken build isolation
+RUN pip install --no-build-isolation chumpy
+
+# Install MMPose from source
+RUN git clone https://github.com/open-mmlab/mmpose.git /mmpose
+WORKDIR /mmpose
+RUN pip install -v -e .
+
+# Fix .mim symlinks (editable install doesn't create them in site-packages)
+RUN mkdir -p /usr/local/lib/python3.10/dist-packages/mmpose/.mim && \
+    ln -sf /mmpose/demo /usr/local/lib/python3.10/dist-packages/mmpose/.mim/demo && \
+    ln -sf /mmpose/configs /usr/local/lib/python3.10/dist-packages/mmpose/.mim/configs && \
+    ln -sf /mmpose/tools /usr/local/lib/python3.10/dist-packages/mmpose/.mim/tools && \
+    ln -sf /mmpose/model-index.yml /usr/local/lib/python3.10/dist-packages/mmpose/.mim/model-index.yml && \
+    ln -sf /mmpose/dataset-index.yml /usr/local/lib/python3.10/dist-packages/mmpose/.mim/dataset-index.yml
+
+# RealSense SDK
+RUN pip install pyrealsense2
+
+# Safety net: force numpy<2 at the end in case any dep pulled numpy 2.x
+RUN pip install "numpy<2"
+
+# Data directory
+RUN mkdir -p /mmpose/data /mmpose/output
+
+CMD ["/bin/bash"]
