@@ -82,29 +82,28 @@ python demo/inferencer_demo.py tests/data/onehand10k/9.jpg \
 
 ---
 
-## Whole-Body Tracking (NOT YET TESTED)
+## Whole-Body Tracking (WORKING)
 
 Detects **133 keypoints** in one pass: 17 body + 6 feet + 68 face + 21 left hand + 21 right hand.
 
 ### Live RealSense feed
 
 ```bash
-python demo/realsense_pose.py \
-    --pose2d configs/wholebody_2d_keypoint/rtmpose/cocktail14/rtmw-m_8xb1024-270e_cocktail14-256x192.py
+python demo/realsense_pose.py --pose2d wholebody
 ```
 
 ### On a test image
 
 ```bash
 python demo/inferencer_demo.py tests/data/coco/000000000785.jpg \
-    --pose2d configs/wholebody_2d_keypoint/rtmpose/cocktail14/rtmw-m_8xb1024-270e_cocktail14-256x192.py \
+    --pose2d wholebody \
     --vis-out-dir output/
 ```
 
-### Status: NOT YET TESTED
+### Status: WORKING
 
 - Uses RTMW model (body + hands + face combined)
-- The `--pose2d wholebody` alias may not resolve due to metafile issues; use the full config path above instead
+- Model auto-downloads on first run
 
 ---
 
@@ -140,4 +139,4 @@ Output saved to `output/realsense_pose.mp4` (mounted at `~/mmpose-output/` on ho
 | Body | `--pose2d human` | 17 | WORKING |
 | Body (fast) | `--pose2d rtmpose-m` | 17 | WORKING |
 | Hand | `--pose2d hand` | 21 | WORKING |
-| Whole-body | `--pose2d configs/wholebody_2d_keypoint/...` | 133 | NOT YET TESTED |
+| Whole-body | `--pose2d wholebody` | 133 | WORKING |
