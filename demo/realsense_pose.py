@@ -22,8 +22,8 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description='RealSense + MMPose skeleton tracker')
     parser.add_argument(
-        '--serial', type=str, default='838212073332',
-        help='RealSense serial number')
+        '--serial', type=str, default=None,
+        help='RealSense serial number (auto-detect if not set)')
     parser.add_argument(
         '--pose2d', type=str, default='human',
         help='Pose model alias (human, rtmpose-m, rtmpose-l, etc.)')
@@ -60,11 +60,12 @@ def main():
     # --- RealSense setup ---
     pipeline = rs.pipeline()
     config = rs.config()
-    config.enable_device(args.serial)
+    if args.serial:
+        config.enable_device(args.serial)
     config.enable_stream(
         rs.stream.color, args.width, args.height, rs.format.bgr8, args.fps)
 
-    print(f'Starting RealSense {args.serial} '
+    print(f'Starting RealSense {args.serial or "auto-detect"} '
           f'({args.width}x{args.height} @ {args.fps}fps)...')
     pipeline.start(config)
 
